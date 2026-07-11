@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface Question {
   topic_id: string;
@@ -14,24 +15,30 @@ export default function AssessmentPage() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     fetch('/api/assessment/trigger')
-      .then((res) => res.json())
-      .then((payload) => {
+      .then(async (res) => {
+        const payload = await res.json();
+        if (!res.ok) {
+          if (res.status === 401 || res.status === 403) {
+            router.replace('/login?role=student');
+            return;
+          }
+        }
         if (payload.questions) {
           setQuestions(payload.questions);
         }
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [router]);
 
   const currentQuestion = questions[activeIndex];
   const progress = useMemo(() => ((activeIndex + 1) / Math.max(questions.length, 1)) * 100, [activeIndex, questions.length]);
 
   const submitAssessment = async () => {
     const payload = {
-      studentId: 'demo-student',
       answers,
       questions,
       submittedAt: new Date().toISOString(),
@@ -43,8 +50,13 @@ export default function AssessmentPage() {
       body: JSON.stringify(payload),
     });
 
-    await response.json();
-    alert('Assessment submitted');
+    const data = await response.json();
+    if (!response.ok) {
+      alert(data.error ?? 'Unable to submit assessment.');
+      return;
+    }
+    alert(`Assessment submitted. Score: ${data.score}/${data.totalQuestions}`);
+    router.push('/student');
   };
 
   if (loading) {

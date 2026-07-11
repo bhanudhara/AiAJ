@@ -2,18 +2,18 @@ import { createServerComponentClient } from '@/lib/supabase';
 import TeacherDashboard from '@/components/teacher-dashboard';
 import { redirect } from 'next/navigation';
 
-export default async function TeacherPage() {
+export default async function TeacherPage({ searchParams }: { searchParams?: { role?: string } }) {
   const supabase = createServerComponentClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/');
+    redirect('/login?role=teacher');
   }
 
-  const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+  const { data: profile } = user ? await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle() : { data: null };
 
   if (!profile || profile.role !== 'teacher') {
-    redirect('/student');
+    redirect('/login?role=teacher');
   }
 
   const { data: students } = await supabase.from('profiles').select('id, full_name').eq('role', 'student');

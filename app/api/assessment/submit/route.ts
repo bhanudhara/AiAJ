@@ -9,6 +9,11 @@ export async function POST(request: Request) {
 
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
+  if (!profile || profile.role !== 'student') {
+    return NextResponse.json({ error: 'Only students can submit assessments' }, { status: 403 });
+  }
+
   const body = await request.json();
   const questions = Array.isArray(body?.questions) ? body.questions : [];
   const answers = body?.answers ?? {};

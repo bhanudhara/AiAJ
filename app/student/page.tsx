@@ -2,27 +2,28 @@ import { createServerComponentClient } from '@/lib/supabase';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
-export default async function StudentPage() {
+export default async function StudentPage({ searchParams }: { searchParams?: { role?: string } }) {
   const supabase = createServerComponentClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/');
+    redirect('/login?role=student');
   }
 
-  const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+  const { data: profile } = user ? await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle() : { data: null };
 
   if (!profile || profile.role !== 'student') {
-    redirect('/teacher');
+    redirect('/login?role=student');
   }
 
   const today = new Date().toISOString().slice(0, 10);
+  const { data: classRecord } = await supabase.from('classes').select('id').eq('date', today).limit(1).maybeSingle();
   const { data: attendance } = await supabase
     .from('attendance')
     .select('*')
-    .eq('student_id', user.id)
-    .eq('class_id', (await supabase.from('classes').select('id').eq('date', today).limit(1).single()).data?.id ?? '')
-    .single();
+    .eq('student_id', user?.id ?? '')
+    .eq('class_id', classRecord?.id ?? '')
+    .maybeSingle();
 
   const isPresent = attendance?.status === 'present';
 

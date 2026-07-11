@@ -10,8 +10,8 @@ export default function HomePage() {
           A full-stack Next.js flow for teacher-led class setup, student attendance gating, and Gemini-powered daily assessment generation.
         </p>
         <div className="mt-8 flex flex-wrap gap-4">
-          <Link href="/teacher" className="rounded-lg bg-cyan-500 px-5 py-3 font-medium text-slate-950">Teacher Dashboard</Link>
-          <Link href="/student" className="rounded-lg border border-slate-700 px-5 py-3 font-medium text-white">Student Dashboard</Link>
+          <Link href="/login?role=teacher" className="rounded-lg bg-cyan-500 px-5 py-3 font-medium text-slate-950">Access as Teacher</Link>
+          <Link href="/login?role=student" className="rounded-lg border border-slate-700 px-5 py-3 font-medium text-white">Access as Student</Link>
         </div>
       </div>
     </main>
