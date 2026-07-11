@@ -34,3 +34,4 @@ GEMINI_API_KEY=your-gemini-api-key
 
 ## Database migration
 Run the SQL in supabase/schema.sql in your Supabase SQL editor.
+# AiAJ
