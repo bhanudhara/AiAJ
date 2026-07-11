@@ -1,0 +1,75 @@
+{
+  "name": "AI Daily Assessment",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "assessment-trigger",
+        "responseMode": "onReceived"
+      },
+      "id": "1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [300, 300]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": "public",
+        "table": "attendance",
+        "query": "SELECT * FROM attendance WHERE class_id = {{$json.classId}} AND student_id = '{{$json.studentId}}'"
+      },
+      "id": "2",
+      "name": "Supabase Fetch Attendance",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [520, 300]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems"
+      },
+      "id": "3",
+      "name": "Code",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [740, 300],
+      "code": "const topics = $json.topics || [];
+const grouped = topics.reduce((acc, topic) => {
+  const key = topic.subject || 'General';
+  if (!acc[key]) acc[key] = [];
+  acc[key].push(topic);
+  return acc;
+}, {});
+return Object.entries(grouped).map(([subject, items]) => ({ subject, topics: items }));"
+    },
+    {
+      "parameters": {
+        "model": "gemini-1.5-pro",
+        "prompt": "You are an elite educational assessment engine. Read this JSON payload of subjects and topics taught today. Generate exactly 3 highly relevant MCQs per topic. Each question must include an explicit 'question_text', four 'options', a 'correct_option' index, and the corresponding 'topic_id'. Return your output strictly as a structured JSON object array matching this schema structure, without markdown wrapping or code blocks.",
+        "options": {
+          "systemMessage": "You are an elite educational assessment engine. Read this JSON payload of subjects and topics taught today. Generate exactly 3 highly relevant MCQs per topic. Each question must include an explicit 'question_text', four 'options', a 'correct_option' index, and the corresponding 'topic_id'. Return your output strictly as a structured JSON object array matching this schema structure, without markdown wrapping or code blocks."
+        }
+      },
+      "id": "4",
+      "name": "Gemini Generate Questions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [960, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Supabase Fetch Attendance", "type": "main", "index": 0 }]]
+    },
+    "Supabase Fetch Attendance": {
+      "main": [[{ "node": "Code", "type": "main", "index": 0 }]]
+    },
+    "Code": {
+      "main": [[{ "node": "Gemini Generate Questions", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "settings": {}
+}

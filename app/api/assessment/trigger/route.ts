@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerComponentClient } from '@/lib/supabase';
+import { buildGeminiQuestions } from '@/lib/gemini';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,14 +31,24 @@ export async function GET() {
 
   const { data: topics } = await supabase.from('topics').select('*').eq('class_id', classId);
 
-  const questions = (topics ?? []).flatMap((topic: any) => [
-    {
-      topic_id: topic.id,
-      question_text: `What is the main idea of ${topic.topic_name}?`,
-      options: ['A', 'B', 'C', 'D'],
-      correct_option: 0,
-    },
-  ]);
+  const questions = await buildGeminiQuestions((topics ?? []).map((topic: any) => ({
+    id: topic.id,
+    subject: topic.subject,
+    topic_name: topic.topic_name,
+  })));
+
+  const webhookUrl = process.env.N8N_WEBHOOK_URL;
+  if (webhookUrl) {
+    try {
+      await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentId: user.id, date: today }),
+      });
+    } catch {
+      // ignore webhook errors and continue with local fallback
+    }
+  }
 
   return NextResponse.json({ ok: true, questions });
 }

@@ -10,16 +10,33 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await request.json();
+  const questions = Array.isArray(body?.questions) ? body.questions : [];
+  const answers = body?.answers ?? {};
   const today = new Date().toISOString().slice(0, 10);
-  const { data: assessment } = await supabase
+
+  const score = questions.reduce((total: number, question: any, index: number) => {
+    const selectedAnswer = answers[index];
+    return total + (selectedAnswer === question.correct_option ? 1 : 0);
+  }, 0);
+
+  const { data: assessment, error } = await supabase
     .from('assessments')
-    .insert({ student_id: user.id, date: today, total_score: 0, strengths: [], weaknesses: [] })
+    .insert({ student_id: user.id, date: today, total_score: score, strengths: score >= 2 ? ['Topic recall'] : [], weaknesses: score < 2 ? ['Review core topics'] : [] })
     .select()
     .single();
 
-  if (!assessment) {
+  if (error || !assessment) {
     return NextResponse.json({ error: 'Unable to create assessment' }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, assessment });
+  for (const question of questions) {
+    await supabase.from('assessment_details').insert({
+      assessment_id: assessment.id,
+      topic_id: question.topic_id,
+      score: answers[questions.indexOf(question)] === question.correct_option ? 1 : 0,
+      recommendation_urls: ['https://www.youtube.com/results?search_query=' + encodeURIComponent(question.topic_id)],
+    });
+  }
+
+  return NextResponse.json({ ok: true, assessment, score, totalQuestions: questions.length });
 }
