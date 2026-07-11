@@ -47,13 +47,19 @@ export default async function StudentPage() {
           </section>
 
           <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-            <h2 className="text-xl font-semibold">Start assessment</h2>
-            <p className="mt-2 text-sm text-slate-400">This action becomes available once attendance is confirmed.</p>
+            <h2 className="text-xl font-semibold">Open assessment</h2>
+            <p className="mt-2 text-sm text-slate-400">Your daily assessment opens here as soon as attendance is confirmed.</p>
+            <div className="mt-5 rounded-xl border border-slate-800 bg-slate-950 p-4">
+              <p className="text-sm text-slate-400">Ready state</p>
+              <p className={`mt-2 text-lg font-semibold ${isPresent ? 'text-emerald-400' : 'text-amber-400'}`}>
+                {isPresent ? 'Assessment unlocked' : 'Waiting for teacher attendance'}
+              </p>
+            </div>
             <Link
               href={isPresent ? '/student/assessment' : '#'}
-              className={`mt-6 inline-flex rounded-lg px-5 py-3 font-medium ${isPresent ? 'bg-emerald-500 text-slate-950' : 'cursor-not-allowed bg-slate-800 text-slate-500'}`}
+              className={`mt-6 inline-flex rounded-lg px-5 py-3 font-medium transition ${isPresent ? 'bg-emerald-500 text-slate-950 hover:bg-emerald-400' : 'cursor-not-allowed bg-slate-800 text-slate-500'}`}
             >
-              {isPresent ? 'Start Daily Assessment' : 'Unavailable'}
+              {isPresent ? 'Open Chat Assessment' : 'Assessment unavailable'}
             </Link>
           </section>
         </div>

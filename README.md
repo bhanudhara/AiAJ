@@ -16,6 +16,7 @@ Create a .env.local with:
 NEXT_PUBLIC_SUPABASE_URL=your-project-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 N8N_WEBHOOK_URL=https://your-n8n-instance.example.com/webhook/assessment-trigger
+GEMINI_API_KEY=your-gemini-api-key
 
 ## n8n workflow outline
 1. Webhook node receives { studentId, date }
