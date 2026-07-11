@@ -21,7 +21,7 @@ export default function SignupPage() {
     setMessage('');
 
     const supabase = createClient();
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: fullName, role } } });
 
     if (error || !data.user) {
       setMessage(error?.message ?? 'Signup failed');
@@ -29,7 +29,14 @@ export default function SignupPage() {
       return;
     }
 
-    const { error: insertError } = await supabase.from('profiles').insert({
+    const session = data.session;
+    if (!session) {
+      setMessage('Confirmation email sent. Please verify your email before logging in.');
+      setLoading(false);
+      return;
+    }
+
+    const { error: insertError } = await supabase.from('profiles').upsert({
       id: data.user.id,
       role,
       full_name: fullName,

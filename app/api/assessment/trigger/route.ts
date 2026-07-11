@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServerComponentClient } from '@/lib/supabase';
+import { createRouteHandlerClient } from '@/src/lib/supabase-server';
 import { buildGeminiQuestions } from '@/src/lib/gemini';
 
 export const dynamic = 'force-dynamic';

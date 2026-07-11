@@ -1,4 +1,4 @@
-import { createServerComponentClient } from '@/lib/supabase';
+import { createServerComponentClient } from '@/src/lib/supabase-server';
 import TeacherDashboard from '@/components/teacher-dashboard';
 import { redirect } from 'next/navigation';
 
