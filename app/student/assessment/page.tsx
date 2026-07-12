@@ -10,11 +10,23 @@ interface Question {
   correct_option: number;
 }
 
+interface EvaluationResult {
+  assessmentId: string;
+  score: number;
+  totalQuestions: number;
+  summary: string;
+  recommendedVideo: string;
+  strengths: string[];
+  weaknesses: string[];
+}
+
 export default function AssessmentPage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<EvaluationResult | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -35,9 +47,13 @@ export default function AssessmentPage() {
   }, [router]);
 
   const currentQuestion = questions[activeIndex];
-  const progress = useMemo(() => ((activeIndex + 1) / Math.max(questions.length, 1)) * 100, [activeIndex, questions.length]);
+  const progress = useMemo(
+    () => ((activeIndex + 1) / Math.max(questions.length, 1)) * 100,
+    [activeIndex, questions.length]
+  );
 
   const submitAssessment = async () => {
+    setSubmitting(true);
     const payload = {
       answers,
       questions,
@@ -51,16 +67,83 @@ export default function AssessmentPage() {
     });
 
     const data = await response.json();
+    setSubmitting(false);
     if (!response.ok) {
       alert(data.error ?? 'Unable to submit assessment.');
       return;
     }
-    alert(`Assessment submitted. Score: ${data.score}/${data.totalQuestions}`);
-    router.push('/student');
+    setResult(data);
   };
 
   if (loading) {
     return <div className="flex min-h-screen items-center justify-center bg-slate-950 text-white">Loading assessment…</div>;
+  }
+
+  if (result) {
+    return (
+      <main className="min-h-screen bg-slate-950 p-6 text-slate-100">
+        <div className="mx-auto max-w-3xl space-y-6 rounded-2xl border border-slate-800 bg-slate-900 p-8">
+          <p className="text-sm uppercase tracking-[0.35em] text-emerald-400">Evaluation complete</p>
+          <h1 className="text-3xl font-semibold">
+            Score: {result.score}/{result.totalQuestions}
+          </h1>
+
+          <section className="rounded-xl border border-slate-800 bg-slate-950 p-5">
+            <h2 className="text-lg font-semibold text-cyan-400">Summary</h2>
+            <p className="mt-2 text-slate-300">{result.summary || 'No summary was generated.'}</p>
+          </section>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <section className="rounded-xl border border-slate-800 bg-slate-950 p-5">
+              <h2 className="text-lg font-semibold text-emerald-400">Strengths</h2>
+              {result.strengths.length ? (
+                <ul className="mt-2 list-disc pl-5 text-slate-300">
+                  {result.strengths.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2 text-sm text-slate-500">None yet.</p>
+              )}
+            </section>
+
+            <section className="rounded-xl border border-slate-800 bg-slate-950 p-5">
+              <h2 className="text-lg font-semibold text-rose-400">Needs work</h2>
+              {result.weaknesses.length ? (
+                <ul className="mt-2 list-disc pl-5 text-slate-300">
+                  {result.weaknesses.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2 text-sm text-slate-500">Great job across the board!</p>
+              )}
+            </section>
+          </div>
+
+          {result.recommendedVideo ? (
+            <section className="rounded-xl border border-slate-800 bg-slate-950 p-5">
+              <h2 className="text-lg font-semibold text-cyan-400">Recommended video</h2>
+              <a
+                href={result.recommendedVideo}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 inline-block break-all text-cyan-400 hover:underline"
+              >
+                {result.recommendedVideo}
+              </a>
+            </section>
+          ) : null}
+
+          <button
+            onClick={() => router.push('/student')}
+            className="rounded-lg bg-emerald-500 px-5 py-3 font-medium text-slate-950"
+          >
+            Back to dashboard
+          </button>
+        </div>
+      </main>
+    );
   }
 
   if (!currentQuestion) {
@@ -79,7 +162,9 @@ export default function AssessmentPage() {
           {currentQuestion.options.map((option, index) => (
             <button
               key={option}
-              className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left ${answers[activeIndex] === index ? 'border-cyan-500 bg-cyan-500/10' : 'border-slate-700 bg-slate-950'}`}
+              className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left ${
+                answers[activeIndex] === index ? 'border-cyan-500 bg-cyan-500/10' : 'border-slate-700 bg-slate-950'
+              }`}
               onClick={() => setAnswers((prev) => ({ ...prev, [activeIndex]: index }))}
             >
               <span>{option}</span>
@@ -97,8 +182,12 @@ export default function AssessmentPage() {
               Next
             </button>
           ) : (
-            <button className="rounded-lg bg-emerald-500 px-4 py-2 font-medium text-slate-950" onClick={submitAssessment}>
-              Submit
+            <button
+              disabled={submitting}
+              className="rounded-lg bg-emerald-500 px-4 py-2 font-medium text-slate-950 disabled:opacity-50"
+              onClick={submitAssessment}
+            >
+              {submitting ? 'Evaluating…' : 'Submit'}
             </button>
           )}
         </div>

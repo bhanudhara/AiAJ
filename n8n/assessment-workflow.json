@@ -1,11 +1,11 @@
 {
-  "name": "AI Daily Assessment",
+  "name": "AI Daily Assessment - Evaluation",
   "nodes": [
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "assessment-trigger",
-        "responseMode": "onReceived"
+        "path": "evaluate-assessment",
+        "responseMode": "responseNode"
       },
       "id": "1",
       "name": "Webhook",
@@ -15,59 +15,66 @@
     },
     {
       "parameters": {
-        "operation": "select",
-        "schema": "public",
-        "table": "attendance",
-        "query": "SELECT * FROM attendance WHERE class_id = {{$json.classId}} AND student_id = '{{$json.studentId}}'"
+        "jsCode": "const topics = $json.topics || [];\nconst grouped = topics.reduce((acc, topic) => {\n  const key = topic.subject || 'General';\n  if (!acc[key]) acc[key] = [];\n  acc[key].push(topic);\n  return acc;\n}, {});\nreturn Object.entries(grouped).map(([subject, items]) => ({ subject, topics: items }));"
       },
       "id": "2",
-      "name": "Supabase Fetch Attendance",
-      "type": "n8n-nodes-base.postgres",
+      "name": "Group Topics",
+      "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [520, 300]
     },
     {
       "parameters": {
-        "mode": "runOnceForAllItems"
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [\n    {\n      \"parts\": [\n        {\n          \"text\": \"You are an academic tutor. A student scored {{ $json.score }} out of {{ $json.totalQuestions }}. Per-topic results: {{ JSON.stringify($json.topics) }}. Respond strictly with a JSON object (no markdown) of shape: { \\\"summary\\\": string, \\\"recommendedVideo\\\": string (single YouTube search URL for the weakest topic), \\\"recommendationUrls\\\": { \\\"<topic_id>\\\": [string] } } where recommendationUrls maps each topic_id to an array of helpful YouTube search URLs.\"\n        }\n      ]\n    }\n  ]\n}",
+        "options": {}
       },
       "id": "3",
-      "name": "Code",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [740, 300],
-      "code": "const topics = $json.topics || [];
-const grouped = topics.reduce((acc, topic) => {
-  const key = topic.subject || 'General';
-  if (!acc[key]) acc[key] = [];
-  acc[key].push(topic);
-  return acc;
-}, {});
-return Object.entries(grouped).map(([subject, items]) => ({ subject, topics: items }));"
+      "name": "Gemini Evaluate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [740, 300]
     },
     {
       "parameters": {
-        "model": "gemini-1.5-pro",
-        "prompt": "You are an elite educational assessment engine. Read this JSON payload of subjects and topics taught today. Generate exactly 3 highly relevant MCQs per topic. Each question must include an explicit 'question_text', four 'options', a 'correct_option' index, and the corresponding 'topic_id'. Return your output strictly as a structured JSON object array matching this schema structure, without markdown wrapping or code blocks.",
-        "options": {
-          "systemMessage": "You are an elite educational assessment engine. Read this JSON payload of subjects and topics taught today. Generate exactly 3 highly relevant MCQs per topic. Each question must include an explicit 'question_text', four 'options', a 'correct_option' index, and the corresponding 'topic_id'. Return your output strictly as a structured JSON object array matching this schema structure, without markdown wrapping or code blocks."
-        }
+        "jsCode": "const data = JSON.parse($json.candidates?.[0]?.content?.parts?.[0]?.text || '{}');\nreturn [{ json: { evaluation: { summary: data.summary, recommendedVideo: data.recommendedVideo, recommendationUrls: data.recommendationUrls } } }];"
       },
       "id": "4",
-      "name": "Gemini Generate Questions",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
+      "name": "Parse Evaluation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [960, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.evaluation) }}"
+      },
+      "id": "5",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1180, 300]
     }
   ],
   "connections": {
     "Webhook": {
-      "main": [[{ "node": "Supabase Fetch Attendance", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Group Topics", "type": "main", "index": 0 }]]
     },
-    "Supabase Fetch Attendance": {
-      "main": [[{ "node": "Code", "type": "main", "index": 0 }]]
+    "Group Topics": {
+      "main": [[{ "node": "Gemini Evaluate", "type": "main", "index": 0 }]]
     },
-    "Code": {
-      "main": [[{ "node": "Gemini Generate Questions", "type": "main", "index": 0 }]]
+    "Gemini Evaluate": {
+      "main": [[{ "node": "Parse Evaluation", "type": "main", "index": 0 }]]
+    },
+    "Parse Evaluation": {
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
     }
   },
   "pinData": {},

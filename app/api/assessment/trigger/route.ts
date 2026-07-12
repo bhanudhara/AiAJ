@@ -1,54 +1,59 @@
 import { NextResponse } from 'next/server';
-import { createServerComponentClient } from '@/lib/supabase';
+import { getCurrentUser } from '@/src/lib/auth';
+import { query } from '@/src/lib/db';
 import { buildGeminiQuestions } from '@/src/lib/gemini';
+import { getN8nEnv } from '@/src/lib/env';
+import { toN8nTopic } from '@/src/lib/n8n';
 
 export const dynamic = 'force-dynamic';
 
+interface TopicRow {
+  id: string;
+  class_id: string;
+  subject: string;
+  topic_name: string;
+}
+
 export async function GET() {
-  const supabase = createServerComponentClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
+  const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
-  if (!profile || profile.role !== 'student') {
+  if (user.role !== 'student') {
     return NextResponse.json({ error: 'Only students can access assessments' }, { status: 403 });
   }
 
   const today = new Date().toISOString().slice(0, 10);
-  const { data: classes } = await supabase.from('classes').select('*').eq('date', today).limit(1);
-  const classId = classes?.[0]?.id;
-
+  const present = await query<Array<{ class_id: string }>>(
+    `SELECT a.class_id
+     FROM attendance a
+     JOIN classes c ON c.id = a.class_id
+     WHERE a.student_id = ? AND a.status = 'present' AND c.date = ?
+     ORDER BY c.date DESC
+     LIMIT 1`,
+    [user.id, today]
+  );
+  const classId = present[0]?.class_id;
   if (!classId) {
-    return NextResponse.json({ error: 'No class for today' }, { status: 404 });
+    return NextResponse.json({ error: 'Student not present for today' }, { status: 403 });
   }
 
-  const { data: attendance } = await supabase
-    .from('attendance')
-    .select('*')
-    .eq('student_id', user.id)
-    .eq('class_id', classId)
-    .single();
+  const topics = await query<TopicRow[]>('SELECT * FROM topics WHERE class_id = ?', [classId]);
+  const questions = await buildGeminiQuestions(
+    (topics ?? []).map((topic) => ({ id: topic.id, subject: topic.subject, topic_name: topic.topic_name }))
+  );
 
-  if (!attendance || attendance.status !== 'present') {
-    return NextResponse.json({ error: 'Student not present' }, { status: 403 });
-  }
-
-  const { data: topics } = await supabase.from('topics').select('*').eq('class_id', classId);
-
-  const questions = await buildGeminiQuestions((topics ?? []).map((topic: any) => ({
-    id: topic.id,
-    subject: topic.subject,
-    topic_name: topic.topic_name,
-  })));
-
-  const webhookUrl = process.env.N8N_WEBHOOK_URL;
-  if (webhookUrl) {
+  const { triggerUrl } = getN8nEnv();
+  if (triggerUrl) {
     try {
-      await fetch(webhookUrl, {
+      await fetch(triggerUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentId: user.id, date: today }),
+        body: JSON.stringify({
+          studentId: user.id,
+          date: today,
+          topics: (topics ?? []).map((topic) =>
+            toN8nTopic({ id: topic.id, subject: topic.subject, topic_name: topic.topic_name })
+          ),
+        }),
       });
     } catch {
       // ignore webhook errors and continue with local fallback

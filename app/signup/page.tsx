@@ -1,11 +1,10 @@
 "use client";
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { createClient } from '../../src/lib/supabase-clinet';
 
-export default function SignupPage() {
+function SignupPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const role = searchParams.get('role') === 'teacher' ? 'teacher' : 'student';
@@ -20,28 +19,20 @@ export default function SignupPage() {
     setLoading(true);
     setMessage('');
 
-    const supabase = createClient();
-    const { data, error } = await supabase.auth.signUp({ email, password });
-
-    if (error || !data.user) {
-      setMessage(error?.message ?? 'Signup failed');
-      setLoading(false);
-      return;
-    }
-
-    const { error: insertError } = await supabase.from('profiles').insert({
-      id: data.user.id,
-      role,
-      full_name: fullName,
+    const response = await fetch('/api/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fullName, email, password, role }),
     });
-    
-    if (insertError) {
-      setMessage(insertError.message);
+    const data = await response.json();
+
+    if (!response.ok) {
+      setMessage(data.error ?? 'Signup failed');
       setLoading(false);
       return;
     }
 
-    router.replace(role === 'teacher' ? '/teacher' : '/student');
+    router.replace(data.user.role === 'teacher' ? '/teacher' : '/student');
   };
 
   return (
@@ -66,5 +57,13 @@ export default function SignupPage() {
         </p>
       </form>
     </main>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-slate-950 text-white">Loading…</div>}>
+      <SignupPageInner />
+    </Suspense>
   );
 }

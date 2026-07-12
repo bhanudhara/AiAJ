@@ -1,9 +1,18 @@
-export type ProfileRole = 'teacher' | 'student';
+export type Role = 'teacher' | 'student';
 
-export interface Profile {
+export interface SessionUser {
   id: string;
-  role: ProfileRole;
+  email: string;
   full_name: string;
+  role: Role;
+}
+
+export interface UserRecord {
+  id: string;
+  full_name: string;
+  email: string;
+  role: Role;
+  created_at: string;
 }
 
 export interface ClassRecord {
@@ -47,6 +56,9 @@ export interface Assessment {
   student_id: string;
   date: string;
   total_score: number;
+  total_questions: number;
+  summary: string;
+  recommended_video: string;
   strengths: string[];
   weaknesses: string[];
 }

@@ -1,39 +1,38 @@
-import { createServerComponentClient } from '@/lib/supabase';
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
+import LogoutButton from '@/components/logout-button';
+import { getCurrentUser } from '@/src/lib/auth';
+import { query } from '@/src/lib/db';
 
-export default async function StudentPage({ searchParams }: { searchParams?: { role?: string } }) {
-  const supabase = createServerComponentClient();
-  const { data: { user } } = await supabase.auth.getUser();
+export const dynamic = 'force-dynamic';
 
-  if (!user) {
-    redirect('/login?role=student');
-  }
-
-  const { data: profile } = user ? await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle() : { data: null };
-
-  if (!profile || profile.role !== 'student') {
-    redirect('/login?role=student');
-  }
+export default async function StudentPage() {
+  const user = await getCurrentUser();
+  if (!user) redirect('/login?role=student');
+  if (user.role !== 'student') redirect('/login?role=student');
 
   const today = new Date().toISOString().slice(0, 10);
-  const { data: classRecord } = await supabase.from('classes').select('id').eq('date', today).limit(1).maybeSingle();
-  const { data: attendance } = await supabase
-    .from('attendance')
-    .select('*')
-    .eq('student_id', user?.id ?? '')
-    .eq('class_id', classRecord?.id ?? '')
-    .maybeSingle();
-
-  const isPresent = attendance?.status === 'present';
+  const attendance = await query<Array<{ status: 'present' | 'absent' }>>(
+    `SELECT a.status
+     FROM attendance a
+     JOIN classes c ON c.id = a.class_id
+     WHERE a.student_id = ? AND c.date = ?
+     ORDER BY c.date DESC
+     LIMIT 1`,
+    [user.id, today]
+  );
+  const isPresent = attendance[0]?.status === 'present';
 
   return (
     <main className="min-h-screen bg-slate-950 p-6 text-slate-100">
       <div className="mx-auto max-w-6xl space-y-8">
-        <div>
-          <p className="text-sm uppercase tracking-[0.35em] text-emerald-400">Student Workspace</p>
-          <h1 className="mt-3 text-3xl font-semibold">Daily assessment readiness</h1>
-        </div>
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm uppercase tracking-[0.35em] text-emerald-400">Student Workspace</p>
+              <h1 className="mt-3 text-3xl font-semibold">Daily assessment readiness</h1>
+            </div>
+            <LogoutButton />
+          </div>
 
         <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
           <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
