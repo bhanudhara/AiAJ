@@ -1,9 +1,9 @@
-import { createServerComponentClient } from '@/lib/supabase';
+import { createServerComponentClient } from '@/src/lib/supabase-server';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 export default async function StudentPage({ searchParams }: { searchParams?: { role?: string } }) {
-  const supabase = createServerComponentClient();
+  const supabase = await createServerComponentClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {

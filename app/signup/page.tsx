@@ -21,7 +21,18 @@ export default function SignupPage() {
     setMessage('');
 
     const supabase = createClient();
-    const { data, error } = await supabase.auth.signUp({ email, password });
+
+    // Pass role + full_name as auth metadata. The database trigger
+    // `handle_new_user` reads this metadata and creates the matching
+    // row in `profiles` atomically (works even with email confirmation
+    // on and with RLS enabled).
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { role, full_name: fullName },
+      },
+    });
 
     if (error || !data.user) {
       setMessage(error?.message ?? 'Signup failed');
@@ -29,18 +40,14 @@ export default function SignupPage() {
       return;
     }
 
-    const { error: insertError } = await supabase.from('profiles').insert({
-      id: data.user.id,
-      role,
-      full_name: fullName,
-    });
-    
-    if (insertError) {
-      setMessage(insertError.message);
+    // If email confirmation is enabled, there is no session yet.
+    if (!data.session) {
+      setMessage('Account created. Check your email to confirm, then sign in.');
       setLoading(false);
       return;
     }
 
+    // Session exists (email confirmation off) -> go straight to workspace.
     router.replace(role === 'teacher' ? '/teacher' : '/student');
   };
 

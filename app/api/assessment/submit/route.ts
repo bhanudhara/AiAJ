@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { createServerComponentClient } from '@/lib/supabase';
+import { createRouteHandlerClient } from '@/src/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
-  const supabase = createServerComponentClient();
+  const supabase = await createRouteHandlerClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

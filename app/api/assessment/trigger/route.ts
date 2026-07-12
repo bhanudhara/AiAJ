@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { createServerComponentClient } from '@/lib/supabase';
+import { createRouteHandlerClient } from '@/src/lib/supabase-server';
 import { buildGeminiQuestions } from '@/src/lib/gemini';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const supabase = createServerComponentClient();
+  const supabase = await createRouteHandlerClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
